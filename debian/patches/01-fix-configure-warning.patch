@@ -1,0 +1,26 @@
+Description: fix a warning in configure script
+ Kill AC_INCLUDES_DEFAULT() which is misused here and causes a warning
+ during execution of the configure script.
+Author: Julien BLACHE <jblache@debian.org>
+Last-Update: 2018-06-15
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/configure.ac
++++ b/configure.ac
+@@ -134,7 +134,7 @@
+  ;;
+ esac
+ 
+-CFLAGS="$CCFLAGS64 $CPPCMNTFLAGS $OPTIMFLAGS $DEBUGFLAGS $WARNFLAGS"
++CFLAGS="$CCFLAGS64 $CPPCMNTFLAGS $OPTIMFLAGS $DEBUGFLAGS $WARNFLAGS $CFLAGS"
+ AC_MSG_RESULT([$CFLAGS])
+ AC_SUBST([OBJECT_MODE])
+ 
+@@ -148,7 +148,6 @@
+ # Checks for libraries.
+ 
+ # Checks for header files.
+-AC_INCLUDES_DEFAULT()
+ AC_HEADER_RESOLV
+ AC_CHECK_HEADERS([sys/malloc.h malloc.h], [], [],
+ [[#ifdef HAVE_SYS_MALLOC_H

@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+ifeq ($(DEB_HOST_ARCH_BITS),64)
+	ENABLE_64BIT = --enable-64bit
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# Configure with ANTLR remote debugger enabled
+	dh_auto_configure --builddirectory=build-dbg -- \
+		--enable-debuginfo --disable-abiflags --enable-antlrdebug \
+		$(ENABLE_64BIT)
+	ln -s ../include build-dbg/
+
+	# Configure with ANTLR remote debugger disabled
+	dh_auto_configure --builddirectory=build-nodbg -- \
+		--enable-debuginfo --disable-abiflags --disable-antlrdebug \
+		$(ENABLE_64BIT)
+	ln -s ../include build-nodbg/
+
+override_dh_auto_build:
+	( cd build-dbg; $(MAKE) )
+	( cd build-nodbg; $(MAKE) )
+
+override_dh_auto_clean:
+	rm -rf build-dbg debian/tmp-dbg
+	rm -rf build-nodbg
+
+override_dh_auto_install:
+	( cd build-dbg; $(MAKE) DESTDIR=$(CURDIR)/debian/tmp-dbg install )
+	( cd build-nodbg; $(MAKE) DESTDIR=$(CURDIR)/debian/tmp install )
+	cp debian/tmp-dbg/usr/lib/$(DEB_HOST_MULTIARCH)/libantlr3c.a \
+		debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libantlr3c_antlrdbg.a
+
+override_dh_install:
+	dh_install --sourcedir=debian/tmp -Nlibantlr3c-antlrdbg-3.4-0
+	dh_install --sourcedir=debian/tmp-dbg -plibantlr3c-antlrdbg-3.4-0

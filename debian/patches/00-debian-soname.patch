@@ -1,0 +1,18 @@
+Description: set a proper soname
+ Upstream doesn't version the ANTLR 3 C runtime (uses -avoid-version!). Use
+ -release X.Y -version-info 0:0:0 for the Debian packages.
+Author: Julien BLACHE <jblache@debian.org>
+Last-Update: 2018-06-15
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -62,7 +62,7 @@
+ 					include/antlr3treeparser.h				\
+ 					antlr3config.h
+ 
+-libantlr3c_la_LDFLAGS = -avoid-version
++libantlr3c_la_LDFLAGS = -release 3.4 -version-info 0:0:0
+ 
+ INCLUDES = -Iinclude
+ 

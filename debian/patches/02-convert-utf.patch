@@ -1,0 +1,187 @@
+Description: Add the required ConvertUTF16toUTF8 function
+ include/antlr3convertutf.h and src/antlr3convertutf.c had to be removed
+ due to licensing issues. This patch provides an alternative implementation
+ of ConvertUTF16toUTF8, the only function that was defined in the removed
+ files that is actually used in the rest of the code.
+Author: Fabian Wolff <fabi.wolff@arcor.de>
+Bug: https://github.com/antlr/antlr3/issues/193
+Bug-Debian: https://bugs.debian.org/900601
+Last-Update: 2018-06-16
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- /dev/null
++++ b/include/antlr3convertutf.h
+@@ -0,0 +1,61 @@
++// [The "BSD licence"]
++// Copyright (c) 2018 Fabian Wolff <fabi.wolff@arcor.de>
++//
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. The name of the author may not be used to endorse or promote products
++//    derived from this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++// OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++// IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++#ifndef	_ANTLR3_CONVERTUTF_H
++#define	_ANTLR3_CONVERTUTF_H
++
++/* This file is Debian-specific, since the upstream implementation
++ * could not be used due to licensing issues (see Debian bug #900601).
++ * A reimplementation for the ConvertUTF16toUTF8() function has been
++ * provided in src/antlr3convertutf.cc because it is used in
++ * src/antlr3string.c. However, ConvertUTF16toUTF8() _MUST NOT_ be
++ * considered part of the public API of this library.
++ */
++
++#include <antlr3defs.h>
++
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
++typedef ANTLR3_UINT32 UTF32;
++typedef ANTLR3_UINT16 UTF16;
++typedef ANTLR3_UINT8  UTF8;
++
++#define UNI_SUR_HIGH_START  (UTF32)0xD800
++#define UNI_SUR_HIGH_END    (UTF32)0xDBFF
++#define UNI_SUR_LOW_START   (UTF32)0xDC00
++#define UNI_SUR_LOW_END     (UTF32)0xDFFF
++#define halfShift           ((UTF32)10)
++#define halfBase            ((UTF32)0x0010000UL)
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // _ANTLR3_CONVERTUTF_H
+--- /dev/null
++++ b/src/antlr3convertutf.cc
+@@ -0,0 +1,47 @@
++// [The "BSD licence"]
++// Copyright (c) 2018 Fabian Wolff <fabi.wolff@arcor.de>
++//
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. The name of the author may not be used to endorse or promote products
++//    derived from this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++// OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++// IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++// NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++#include <antlr3convertutf.h>
++#include <codecvt>
++#include <locale>
++#include <string>
++
++extern "C" void ConvertUTF16toUTF8 (
++    const UTF16 **sourceStart,
++    const UTF16 *sourceEnd,
++    UTF8 **targetStart,
++    UTF8 *targetEnd
++    )
++{
++    std::u16string u16;
++    u16.insert (0, (const char16_t *) *sourceStart, (std::u16string::size_type) (sourceEnd - (*sourceStart)));
++
++    std::string u8 = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>,char16_t> ().to_bytes (u16);
++
++    for (int i = 0; i < u8.length (); ++i, (*targetStart) += 1)
++        **targetStart = u8.at (i);
++}
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -13,7 +13,7 @@
+ 					src/antlr3commontree.c				\
+ 					src/antlr3commontreeadaptor.c		\
+ 					src/antlr3commontreenodestream.c	\
+-					src/antlr3convertutf.c				\
++					src/antlr3convertutf.cc				\
+ 					src/antlr3cyclicdfa.c				\
+ 					src/antlr3debughandlers.c			\
+ 					src/antlr3encodings.c				\
+--- a/configure.ac
++++ b/configure.ac
+@@ -54,6 +54,7 @@
+ AM_INIT_AUTOMAKE(foreign)
+ AC_LANG(C)
+ AC_PROG_CC([xlc aCC gcc cc])
++AC_PROG_CXX([g++ c++])
+ AM_MAINTAINER_MODE
+ AM_PROG_LIBTOOL
+ 
+--- a/src/antlr3string.c
++++ b/src/antlr3string.c
+@@ -351,6 +351,13 @@
+ 	return string->factory->newPtr(string->factory, (pANTLR3_UINT8)(string->chars), string->len);
+ }
+ 
++extern void ConvertUTF16toUTF8 (
++    const UTF16 **sourceStart,
++    const UTF16 *sourceEnd,
++    UTF8 **targetStart,
++    UTF8 *targetEnd
++    );
++
+ // Convert a UTF16 string into a UTF8 representation using the Unicode.org
+ // supplied C algorithms, which are now contained within the ANTLR3 C runtime
+ // as permitted by the Unicode license (within the source code antlr3convertutf.c/.h
+@@ -364,8 +371,6 @@
+     UTF16	      * inputEnd;
+     pANTLR3_STRING	utf8String;
+ 
+-    ConversionResult	cResult;
+-
+     // Allocate the output buffer, which needs to accommodate potentially
+     // 3X (in bytes) the input size (in chars).
+     //
+@@ -389,13 +394,12 @@
+ 
+             // Call the Unicode converter
+             //
+-            cResult =  ConvertUTF16toUTF8
++            ConvertUTF16toUTF8
+                 (
+                 (const UTF16**)&inputEnd, 
+                 ((const UTF16 *)(string->chars)) + string->len, 
+                 &outputEnd, 
+-                outputEnd + utf8String->size - 1,
+-                lenientConversion
++                outputEnd + utf8String->size - 1
+                 );
+ 
+             // We don't really care if things failed or not here, we just converted
